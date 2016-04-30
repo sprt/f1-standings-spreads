@@ -134,7 +134,10 @@ for i, standing in enumerate(standings):
     j = i + 1
     while j < len(standings_copy) and points:
         if standings_copy[j].driver.code not in IGNORED:
-            standings_copy[j].points += points.pop()
+            for k, score in enumerate(points):
+                if standings_copy[j].points + score > standings_copy[i].points:
+                    standings_copy[j].points += points.pop(k)
+                    break
         j += 1
 
     standings_copy.sort_by_points()
