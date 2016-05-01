@@ -1,11 +1,12 @@
 import collections
 import copy
+import functools
 import operator
 
 import requests
 
 
-def object_hook(d: dict):
+def standings_object_hook(d: dict):
     if d.get('Driver'):
         d['Driver'] = Driver.from_json(d['Driver'])
     elif d.get('DriverStandings'):
@@ -16,11 +17,27 @@ def object_hook(d: dict):
     return d
 
 
+def results_object_hook(d: dict):
+    if d.get('Driver'):
+        d['Driver'] = Driver.from_json(d['Driver'])
+    elif d.get('Results'):
+        results = []
+        for res in d['Results']:
+            try:
+                int(res['positionText'])
+            except ValueError:
+                continue
+            results.append(RaceResult.from_json(res))
+        d['Results'] = results
+    return d
+
+
 class Driver:
     def __init__(self, *, id, code, lastname):
         self.id = id
         self.code = code
         self.lastname = lastname
+        self.finishes = {}
 
     def __eq__(self, other):
         return self.id == other.id
@@ -36,10 +53,19 @@ class Driver:
         return cls(id=d['driverId'], code=d['code'], lastname=d['familyName'])
 
 
+@functools.total_ordering
 class DriverStanding:
     def __init__(self, *, driver, points):
         self.driver = driver
         self.points = points
+
+    def __lt__(self, other):
+        if self.points != other.points:
+            return self.points < other.points
+        for pos, count in self.driver.finishes.items():
+            if count != other.driver.finishes[pos]:
+                return count < other.driver.finishes[pos]
+        return False
 
     def __str__(self):
         return '%s   %2d pts' % (self.driver.code, self.points)
@@ -57,7 +83,7 @@ class DriverStandings(collections.UserList):
         return '\n'.join(s)
 
     def sort_by_points(self):
-        self.sort(key=operator.attrgetter('points'), reverse=True)
+        self.sort(reverse=True)
 
     def index_driver(self, driver):
         return [standing.driver for standing in self].index(driver)
@@ -73,15 +99,42 @@ class PositionSpread:
         self.high = high
 
 
-URL = 'http://ergast.com/api/f1/current/driverStandings.json'
-r = requests.get(URL)
-data = r.json(object_hook=object_hook)
+class RaceResult:
+    def __init__(self, *, driver, position):
+        self.driver = driver
+        self.position = position
 
-standings = data['MRData']['StandingsTable']['StandingsLists'][0]['DriverStandings']  # type: DriverStandings
+    @classmethod
+    def from_json(cls, d):
+        return cls(driver=d['Driver'], position=int(d['position']))
+
+
+STANDINGS_URL = 'http://ergast.com/api/f1/current/driverStandings.json'
+RESULTS_URL = 'http://ergast.com/api/f1/current/results.json'
+
+standings_resp = requests.get(STANDINGS_URL)
+standings_data = standings_resp.json(object_hook=standings_object_hook)
+
+results_resp = requests.get(RESULTS_URL, params={'limit': 1000})
+results_data = results_resp.json(object_hook=results_object_hook)
+
+standings = standings_data['MRData']['StandingsTable']['StandingsLists'][0]['DriverStandings']  # type: DriverStandings
 standings.sort_by_points()
+
+race_results = []
+for race in results_data['MRData']['RaceTable']['Races']:
+    race_results.extend(race['Results'])
 
 # drivers who won't race
 IGNORED = ['VAN']
+
+for i, standing in enumerate(standings):
+    for i in range(1, len(standings) - len(IGNORED) + 1):
+        standing.driver.finishes[i] = 0
+    for result in race_results:
+        if standing.driver == result.driver:
+            standing.driver.finishes[result.position] += 1
+    standings[i].driver.finishes = collections.OrderedDict(sorted(standing.driver.finishes.items()))
 
 spreads = collections.OrderedDict()
 
@@ -131,14 +184,24 @@ for i, standing in enumerate(standings):
     standings_copy = copy.deepcopy(standings)  # type: DriverStandings
     points = [1, 2, 4, 6, 8, 10, 12, 15, 18, 25]
 
-    j = i + 1
-    while j < len(standings_copy) and points:
+    last_pos = len(standings) - len(IGNORED)
+    standings_copy[i].driver.finishes.setdefault(last_pos, 0)
+    standings_copy[i].driver.finishes[last_pos] += 1
+
+    j = len(standings) - 1
+    while j > i and points:
         if standings_copy[j].driver.code not in IGNORED:
             for k, score in enumerate(points):
-                if standings_copy[j].points + score > standings_copy[i].points:
-                    standings_copy[j].points += points.pop(k)
+                standings_copy2 = copy.deepcopy(standings_copy)
+                standings_copy2[j].points += score
+                standings_copy2[j].driver.finishes.setdefault(10 - k, 0)
+                standings_copy2[j].driver.finishes[10 - k] += 1
+
+                if standings_copy[i] < standings_copy2[j]:
+                    standings_copy[j] = copy.deepcopy(standings_copy2[j])
+                    points.pop(k)
                     break
-        j += 1
+        j -= 1
 
     standings_copy.sort_by_points()
     low_pos = standings_copy.get_driver_pos(standing.driver)
