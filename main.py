@@ -144,27 +144,34 @@ for i, standing in enumerate(standings):
 
     is_ignored = standing.driver.code in IGNORED
     points = [1, 2, 4, 6, 8, 10, 12, 15, 18]
+    pos = 2
 
     temp_standings[i].points += 25 if not is_ignored else 0
+    temp_standings[i].driver.finishes[1] += 1
     temp_standings.sort_by_points()
     temp_i = temp_standings.index_driver(standing.driver)
 
     def do_behind():
-        global points
+        global points, pos
         j = len(standings_copy) - 1
         while j > i and points:
             if standings_copy[j].driver.code not in IGNORED:
                 standings_copy[j].points += points.pop()
+                standings_copy[j].driver.finishes[pos] += 1
+                pos += 1
             j -= 1
 
     if not is_ignored:
         standings_copy[i].points += 25
+        standings_copy[i].driver.finishes[1] += 1
         do_behind()
 
     j = 0
     while j < temp_i and points:
         if standings_copy[j].driver.code not in IGNORED:
             standings_copy[j].points += points.pop()
+            standings_copy[j].driver.finishes[pos] += 1
+            pos += 1
         j += 1
 
     if is_ignored:
@@ -174,6 +181,8 @@ for i, standing in enumerate(standings):
     while j >= temp_i and points:
         if standings_copy[j].driver.code not in IGNORED:
             standings_copy[j].points += points.pop()
+            standings_copy[j].driver.finishes[pos] += 1
+            pos += 1
         j -= 1
 
     standings_copy.sort_by_points()
