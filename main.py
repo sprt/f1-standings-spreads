@@ -191,7 +191,7 @@ for i, standing in enumerate(standings):
 
 for i, standing in enumerate(standings):
     standings_copy = copy.deepcopy(standings)  # type: DriverStandings
-    points = [1, 2, 4, 6, 8, 10, 12, 15, 18, 25]
+    points = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
 
     last_pos = len(standings) - len(IGNORED)
     standings_copy[i].driver.finishes.setdefault(last_pos, 0)
@@ -200,11 +200,11 @@ for i, standing in enumerate(standings):
     j = len(standings) - 1
     while j > i and points:
         if standings_copy[j].driver.code not in IGNORED:
-            for k, score in enumerate(points):
+            for k, score in points.items():
                 standings_copy2 = copy.deepcopy(standings_copy)
                 standings_copy2[j].points += score
-                standings_copy2[j].driver.finishes.setdefault(10 - k, 0)
-                standings_copy2[j].driver.finishes[10 - k] += 1
+                standings_copy2[j].driver.finishes.setdefault(k, 0)
+                standings_copy2[j].driver.finishes[k] += 1
 
                 if standings_copy[i] < standings_copy2[j]:
                     standings_copy[j] = copy.deepcopy(standings_copy2[j])
