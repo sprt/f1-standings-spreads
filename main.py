@@ -209,6 +209,7 @@ for i, standing in enumerate(standings):
                 if standings_copy[i] < standings_copy2[j]:
                     standings_copy[j] = copy.deepcopy(standings_copy2[j])
                     points.pop(k)
+                    print(standings_copy2[j].driver, k)
                     break
         j -= 1
 
@@ -216,5 +217,10 @@ for i, standing in enumerate(standings):
     low_pos = standings_copy.get_driver_pos(standing.driver)
     spreads[standing.driver].low = low_pos
 
+    print('---')
+    print(standing.driver)
+    print(standings_copy)
+    print()
+
 for driver, spread in spreads.items():
-    print('%2d. %s %2d %2d' % (spread.current, driver.code, spread.high, spread.low))
+    print('%2d. %s   %2d %2d' % (spread.current, driver.code, spread.high, spread.low))
