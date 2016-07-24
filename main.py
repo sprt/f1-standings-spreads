@@ -146,9 +146,10 @@ for i, standing in enumerate(standings):
     points = [1, 2, 4, 6, 8, 10, 12, 15, 18]
     pos = 2
 
-    temp_standings[i].points += 25 if not is_ignored else 0
-    temp_standings[i].driver.finishes[1] += 1
-    temp_standings.sort_by_points()
+    if not is_ignored:
+        temp_standings[i].points += 25
+        temp_standings[i].driver.finishes[1] += 1
+        temp_standings.sort_by_points()
     temp_i = temp_standings.index_driver(standing.driver)
 
     def do_behind():
@@ -191,7 +192,7 @@ for i, standing in enumerate(standings):
 
 for i, standing in enumerate(standings):
     standings_copy = copy.deepcopy(standings)  # type: DriverStandings
-    points = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    points = collections.OrderedDict(sorted({1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}.items()))
 
     last_pos = len(standings) - len(IGNORED)
     standings_copy[i].driver.finishes.setdefault(last_pos, 0)
